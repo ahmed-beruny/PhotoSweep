@@ -18,6 +18,11 @@ struct SidebarPanel: View {
                 // File Explorer Navigation Panel (Always shown!)
                 FileNavigatorView()
                 
+                // Photo Details (EXIF) Card — shown when a photo with EXIF is active
+                if let exif = state.activeExif {
+                    PhotoDetailsCard(exif: exif)
+                }
+                
                 if state.totalCount > 0 {
                     // Progression Card
                     ProgressCard(processedCount: processedCount, totalCount: state.totalCount, progressRatio: progressRatio)

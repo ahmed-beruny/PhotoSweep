@@ -51,6 +51,7 @@ struct ExplorerFolderRow: View {
                     .stroke(isActive ? Color.accentPrimary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
             .cornerRadius(6)
+            .contentShape(Rectangle()) // Make entire row hit-testable
         }
         .buttonStyle(.plain)
         .onHover { hover in

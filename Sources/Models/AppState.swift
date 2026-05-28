@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import ImageIO
 
 // --- Application State Engine ---
 class AppState: ObservableObject {
@@ -35,6 +36,23 @@ class AppState: ObservableObject {
     @Published var toastMessage: String? = nil
     @Published var toastIcon: String = "info"
     @Published var lastVisitedSubfolder: String? = nil
+
+    // EXIF Metadata for sidebar
+    @Published var activeExif: ExifData? = nil
+
+    struct ExifData {
+        var make: String?
+        var model: String?
+        var lens: String?
+        var focalLength: String?
+        var aperture: String?
+        var shutterSpeed: String?
+        var iso: String?
+        var exposureMode: String?
+        var whiteBalance: String?
+        var flash: String?
+        var dateTaken: String?
+    }
     
     struct ImageFile: Identifiable, Equatable {
         let id = UUID()
@@ -357,22 +375,124 @@ class AppState: ObservableObject {
         }
     }
     
-    // Loads current NSImage or video frame off the main thread to guarantee smooth transitions
     // Loads current NSImage off the main thread to guarantee smooth transitions
     func loadActiveImage() {
         guard currentIndex >= 0 && currentIndex < images.count else {
             self.activeImage = nil
+            self.activeExif = nil
             return
         }
         
         let path = images[currentIndex].path
         DispatchQueue.global(qos: .userInteractive).async {
-            if let image = NSImage(contentsOfFile: path) {
-                DispatchQueue.main.async {
-                    self.activeImage = image
-                }
+            let image = NSImage(contentsOfFile: path)
+            let exif = Self.extractExif(from: path)
+            DispatchQueue.main.async {
+                self.activeImage = image
+                self.activeExif = exif
             }
         }
+    }
+
+    // Extracts EXIF metadata using ImageIO (no full pixel decode needed)
+    static func extractExif(from path: String) -> ExifData? {
+        let url = URL(fileURLWithPath: path) as CFURL
+        guard let src = CGImageSourceCreateWithURL(url, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else {
+            return nil
+        }
+
+        let exifDict  = props[kCGImagePropertyExifDictionary]  as? [CFString: Any]
+        let tiffDict  = props[kCGImagePropertyTIFFDictionary]  as? [CFString: Any]
+        let exifAuxDict = props[kCGImagePropertyExifAuxDictionary] as? [CFString: Any]
+
+        // Focal length
+        var focalLength: String? = nil
+        if let fl = exifDict?[kCGImagePropertyExifFocalLength] as? Double {
+            focalLength = "\(Int(fl)) mm"
+        }
+
+        // Aperture / F-number
+        var aperture: String? = nil
+        if let fn = exifDict?[kCGImagePropertyExifFNumber] as? Double {
+            aperture = String(format: "f/%.1f", fn)
+        }
+
+        // Shutter speed (ExposureTime in seconds)
+        var shutterSpeed: String? = nil
+        if let et = exifDict?[kCGImagePropertyExifExposureTime] as? Double, et > 0 {
+            if et >= 1.0 {
+                shutterSpeed = String(format: "%.0f s", et)
+            } else {
+                let denom = Int(round(1.0 / et))
+                shutterSpeed = "1/\(denom) s"
+            }
+        }
+
+        // ISO
+        var iso: String? = nil
+        if let isoArray = exifDict?[kCGImagePropertyExifISOSpeedRatings] as? [Int], let first = isoArray.first {
+            iso = "ISO \(first)"
+        }
+
+        // Lens model
+        let lens = (exifAuxDict?[kCGImagePropertyExifAuxLensModel] as? String) ??
+                   (exifDict?[kCGImagePropertyExifLensModel] as? String)
+
+        // Camera make / model
+        let make  = tiffDict?[kCGImagePropertyTIFFMake]  as? String
+        let model = tiffDict?[kCGImagePropertyTIFFModel] as? String
+
+        // Exposure mode
+        var exposureMode: String? = nil
+        if let em = exifDict?[kCGImagePropertyExifExposureMode] as? Int {
+            exposureMode = [0: "Auto", 1: "Manual", 2: "Auto-Bracket"][em]
+        }
+
+        // White balance
+        var whiteBalance: String? = nil
+        if let wb = exifDict?[kCGImagePropertyExifWhiteBalance] as? Int {
+            whiteBalance = wb == 0 ? "Auto" : "Manual"
+        }
+
+        // Flash
+        var flash: String? = nil
+        if let fl = exifDict?[kCGImagePropertyExifFlash] as? Int {
+            flash = (fl & 0x1) != 0 ? "Fired" : "Off"
+        }
+
+        // Date taken
+        var dateTaken: String? = nil
+        if let dt = exifDict?[kCGImagePropertyExifDateTimeOriginal] as? String {
+            // Format: "yyyy:MM:dd HH:mm:ss" → make pretty
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+            if let date = formatter.date(from: dt) {
+                formatter.dateFormat = "MMM d, yyyy • h:mm a"
+                dateTaken = formatter.string(from: date)
+            } else {
+                dateTaken = dt
+            }
+        }
+
+        // Return nil if no meaningful EXIF found
+        guard focalLength != nil || aperture != nil || shutterSpeed != nil || iso != nil || make != nil else {
+            return nil
+        }
+
+        return ExifData(
+            make: make,
+            model: model,
+            lens: lens,
+            focalLength: focalLength,
+            aperture: aperture,
+            shutterSpeed: shutterSpeed,
+            iso: iso,
+            exposureMode: exposureMode,
+            whiteBalance: whiteBalance,
+            flash: flash,
+            dateTaken: dateTaken
+        )
     }
     
     // Performs Keep Action
