@@ -1,0 +1,24 @@
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Compiled macOS Application Bundles & Binaries
+*.app/
+PhotoSweep
+PhotoSweep_bin
+
+# DMG disk images
+*.dmg
+
+# Temporary Icon assets
+AppIcon.iconset/
