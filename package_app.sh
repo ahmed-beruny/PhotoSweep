@@ -7,9 +7,10 @@ ICON_SOURCE_PNG="$1" # Pass the source PNG path as the first argument
 
 echo "=== Packaging ${APP_NAME} into a native macOS Application ==="
 
-# 1. Compile the main.swift file
-echo "-> Compiling main.swift..."
-swiftc -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -parse-as-library -O main.swift -o "${APP_NAME}_bin"
+# 1. Compile all Swift source files from the Sources/ directory
+echo "-> Compiling Sources/**/*.swift..."
+SWIFT_FILES=$(find Sources -name "*.swift" | tr '\n' ' ')
+swiftc -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -parse-as-library -O $SWIFT_FILES -o "${APP_NAME}_bin"
 
 # 2. Create the directory structures
 echo "-> Creating application bundle folder..."

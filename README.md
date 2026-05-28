@@ -26,9 +26,36 @@
 
 ## Technical Overview
 
-* **Source File**: `main.swift` (contains the complete SwiftUI application architecture, state engine, and event monitor).
-* **Bundle Creator**: `package_app.sh` (packages the compiled binary into a standard `.app` bundle, generates a Retina-ready `.icns` iconset from PNG, configures plist metadata, and ad-hoc signs).
+PhotoSweep follows a modular architecture using a `Sources/` directory, organized into logical layers:
+
+```
+Sources/
+├── main.swift                          # @main App entry point
+├── Helpers/
+│   └── Extensions.swift                # Size formatter + Color design system
+├── Models/
+│   └── AppState.swift                  # State engine, file loading, keyboard monitor
+└── Views/
+    ├── ContentView.swift               # Root split-panel layout
+    ├── HeaderBar.swift                 # Top unified titlebar
+    ├── OnboardingView.swift            # Welcome screen + shortcuts cheatsheet
+    ├── WorkspacePanel.swift            # Interactive photo deck, pinch-to-zoom, swipe
+    ├── FilmstripTimeline.swift         # Bottom horizontal thumbnail queue
+    ├── ThumbnailView.swift             # Async AppKit-downscaled thumbnail
+    ├── ToastOverlay.swift              # HUD notification pop-up overlay
+    └── Sidebar/
+        ├── SidebarPanel.swift          # Left scrollable panel wrapper
+        ├── FileNavigatorView.swift     # File & removable volume navigator
+        ├── ProgressCard.swift          # Sweep completion progress bar
+        ├── StatBox.swift               # Individual disk/photo metric component
+        ├── ShortcutRow.swift           # Keyboard shortcut legend row
+        ├── ExplorerFolderRow.swift     # Directory row list entry
+        └── QuickLocationButton.swift   # Quick-access location grid icon button
+```
+
+* **Bundle Creator**: `package_app.sh` (compiles all `Sources/**/*.swift`, packages into a `.app` bundle, generates a Retina-ready `.icns` iconset, configures plist metadata, and ad-hoc signs).
 * **DMG Packager**: `package_dmg.sh` (builds the signed app bundle and compiles it into a standard compressed macOS `PhotoSweep.dmg` installer with drag-and-drop links).
+
 
 ---
 
@@ -38,8 +65,9 @@ You can easily compile, sign, and launch or package the application natively fro
 
 ### 1. Compile and Run Local Binary (For Testing)
 ```bash
-# Compile main.swift into a native binary
-swiftc -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -parse-as-library -O main.swift -o PhotoSweep
+# Compile all Swift source files under Sources/ into a native binary
+swiftc -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -parse-as-library -O \
+  $(find Sources -name "*.swift") -o PhotoSweep
 
 # Ad-hoc sign (Required on Apple Silicon)
 codesign --force --deep --sign - PhotoSweep
